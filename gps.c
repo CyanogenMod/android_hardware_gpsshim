@@ -20,6 +20,8 @@
 
 #include <hardware/gps.h>
 
+//#define LOG_NDEBUG 0
+
 #include <stdlib.h>
 #define LOG_TAG "gps-shim"
 #include <utils/Log.h>
@@ -260,8 +262,9 @@ static const void* wrapper_get_extension(const char* name)
     return NULL;
 }
 
-static OldGpsCallbacks oldCallbacks;
 static int  init_wrapper(GpsCallbacks* callbacks) {
+    LOGV("init_wrapper was called");
+    static OldGpsCallbacks oldCallbacks;
     originalCallbacks = callbacks;
     oldCallbacks.location_cb = location_callback_wrapper;
     oldCallbacks.status_cb = status_callback_wrapper;
@@ -280,17 +283,23 @@ static int set_position_mode_wrapper(GpsPositionMode mode, GpsPositionRecurrence
 }
 
 
+static void cleanup_wrapper() {
+    /* Cleanup is killing something that prevents further starts.
+     * Skip it for now :\ */
+    //originalGpsInterface->cleanup();
+}
 
 /* HAL Methods */
 const GpsInterface* gps__get_gps_interface(struct gps_device_t* dev)
 {
+	LOGV("get_interface was called");
     originalGpsInterface = gps_get_hardware_interface();
 
     newGpsInterface.size = sizeof(GpsInterface);
     newGpsInterface.init = init_wrapper;
     newGpsInterface.start = originalGpsInterface->start;
     newGpsInterface.stop = originalGpsInterface->stop;
-    newGpsInterface.cleanup = originalGpsInterface->cleanup;
+    newGpsInterface.cleanup = cleanup_wrapper;
     newGpsInterface.inject_time = originalGpsInterface->inject_time;
     newGpsInterface.inject_location = originalGpsInterface->inject_location;
     newGpsInterface.delete_aiding_data = originalGpsInterface->delete_aiding_data;
