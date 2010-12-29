@@ -3,7 +3,7 @@
  * load older GPS libraries on gingerbread (and above?)
  *
  * Copyright 2010 - Ricardo Cerqueira
-******************************************************************************/
+ ******************************************************************************/
 
 #include <hardware/gps.h>
 
@@ -35,7 +35,7 @@ typedef struct {
 typedef void (* old_agps_status_callback)(OldAGpsStatus* status);
 
 typedef struct {
-        old_agps_status_callback status_cb;
+    old_agps_status_callback status_cb;
 } OldAGpsCallbacks;
 
 typedef struct {
@@ -49,8 +49,8 @@ typedef struct {
 /* NI */
 typedef struct
 {
-   void (*init) (GpsNiCallbacks *callbacks);
-   void (*respond) (int notif_id, GpsUserResponseType user_response);
+    void (*init) (GpsNiCallbacks *callbacks);
+    void (*respond) (int notif_id, GpsUserResponseType user_response);
 } OldGpsNiInterface;
 
 /* Core structures */
@@ -77,11 +77,11 @@ typedef struct {
 } OldGpsSvInfo;
 
 typedef struct {
-        int         num_svs;
-        OldGpsSvInfo   sv_list[GPS_MAX_SVS];
-        uint32_t    ephemeris_mask;
-        uint32_t    almanac_mask;
-        uint32_t    used_in_fix_mask;
+    int         num_svs;
+    OldGpsSvInfo   sv_list[GPS_MAX_SVS];
+    uint32_t    ephemeris_mask;
+    uint32_t    almanac_mask;
+    uint32_t    used_in_fix_mask;
 } OldGpsSvStatus;
 
 
@@ -91,10 +91,10 @@ typedef void (* old_gps_status_callback)(OldGpsStatus* status);
 typedef void (* old_gps_sv_status_callback)(OldGpsSvStatus* sv_info);
 
 typedef struct {
-        old_gps_location_callback location_cb;
-        old_gps_status_callback status_cb;
-        old_gps_sv_status_callback sv_status_cb;
-        gps_nmea_callback nmea_cb;
+    old_gps_location_callback location_cb;
+    old_gps_status_callback status_cb;
+    old_gps_sv_status_callback sv_status_cb;
+    gps_nmea_callback nmea_cb;
 } OldGpsCallbacks;
 
 
@@ -104,7 +104,7 @@ typedef struct {
     int   (*stop)( void );
     void  (*cleanup)( void );
     int   (*inject_time)(GpsUtcTime time, int64_t timeReference,
-                         int uncertainty);
+            int uncertainty);
     int  (*inject_location)(double latitude, double longitude, float accuracy);
     void  (*delete_aiding_data)(GpsAidingData flags);
     int   (*set_position_mode)(GpsPositionMode mode, int fix_frequency);
@@ -127,8 +127,8 @@ extern const OldGpsInterface* gps_get_hardware_interface();
 
 
 static void location_callback_wrapper(OldGpsLocation *location) {
-	static GpsLocation newLocation;
-	LOGV("I have a location");
+    static GpsLocation newLocation;
+    LOGV("I have a location");
     newLocation.size = sizeof(GpsLocation);
     newLocation.flags = location->flags;
     newLocation.latitude = location->latitude;
@@ -138,39 +138,39 @@ static void location_callback_wrapper(OldGpsLocation *location) {
     newLocation.bearing = location->bearing;
     newLocation.accuracy = location->accuracy;
     newLocation.timestamp = location->timestamp;
-	originalCallbacks->create_thread_cb("gpsshim-location",(void *)originalCallbacks->location_cb,(void *)&newLocation);
+    originalCallbacks->create_thread_cb("gpsshim-location",(void *)originalCallbacks->location_cb,(void *)&newLocation);
 }
 
 static void status_callback_wrapper(OldGpsStatus *status) {
-	static GpsStatus newStatus;
+    static GpsStatus newStatus;
     newStatus.size = sizeof(GpsStatus);
-	LOGV("Status value is %u",status->status);
+    LOGV("Status value is %u",status->status);
     newStatus.status = status->status;
-	originalCallbacks->create_thread_cb("gpsshim-status",(void *)originalCallbacks->status_cb,(void *)&newStatus);
+    originalCallbacks->create_thread_cb("gpsshim-status",(void *)originalCallbacks->status_cb,(void *)&newStatus);
 }
 
 static void svstatus_callback_wrapper(OldGpsSvStatus *sv_info) {
-	static GpsSvStatus newSvStatus;
-	int i=0;
-	LOGV("I have a svstatus");
+    static GpsSvStatus newSvStatus;
+    int i=0;
+    LOGV("I have a svstatus");
     newSvStatus.size = sizeof(GpsSvStatus);
     newSvStatus.num_svs = sv_info->num_svs;
-	for (i=0; i<newSvStatus.num_svs; i++) {
-		newSvStatus.sv_list[i].size = sizeof(GpsSvInfo);
-		newSvStatus.sv_list[i].prn = sv_info->sv_list[i].prn;
-		newSvStatus.sv_list[i].snr = sv_info->sv_list[i].snr;
-		newSvStatus.sv_list[i].elevation = sv_info->sv_list[i].elevation;
-		newSvStatus.sv_list[i].azimuth = sv_info->sv_list[i].azimuth;
-	}
+    for (i=0; i<newSvStatus.num_svs; i++) {
+        newSvStatus.sv_list[i].size = sizeof(GpsSvInfo);
+        newSvStatus.sv_list[i].prn = sv_info->sv_list[i].prn;
+        newSvStatus.sv_list[i].snr = sv_info->sv_list[i].snr;
+        newSvStatus.sv_list[i].elevation = sv_info->sv_list[i].elevation;
+        newSvStatus.sv_list[i].azimuth = sv_info->sv_list[i].azimuth;
+    }
     newSvStatus.ephemeris_mask = sv_info->ephemeris_mask;
     newSvStatus.almanac_mask = sv_info->almanac_mask;
     newSvStatus.used_in_fix_mask = sv_info->used_in_fix_mask;
-	originalCallbacks->create_thread_cb("gpsshim-svstatus",(void *)originalCallbacks->sv_status_cb,(void *)&newSvStatus);
+    originalCallbacks->create_thread_cb("gpsshim-svstatus",(void *)originalCallbacks->sv_status_cb,(void *)&newSvStatus);
 }
 
 static void nmea_callback_wrapper(GpsUtcTime timestamp, const char* nmea, int length) {
-	// Sink it for now. Needs to run in a thread_cb
-	// originalCallbacks->nmea_cb(timestamp, nmea, length);
+    // Sink it for now. Needs to run in a thread_cb
+    // originalCallbacks->nmea_cb(timestamp, nmea, length);
 }
 
 static OldAGpsCallbacks oldAGpsCallbacks;
@@ -178,19 +178,19 @@ static const AGpsCallbacks* newAGpsCallbacks = NULL;
 
 static void agps_status_cb(OldAGpsStatus* status)
 {
-	AGpsStatus newAGpsStatus;
-	newAGpsStatus.size = sizeof(AGpsStatus);
-	newAGpsStatus.type = status->type;
-	newAGpsStatus.status = status->status;
-	newAGpsCallbacks->create_thread_cb("gpsshim-agpsstatus",(void *)newAGpsCallbacks->status_cb,(void*)&newAGpsStatus);	
+    AGpsStatus newAGpsStatus;
+    newAGpsStatus.size = sizeof(AGpsStatus);
+    newAGpsStatus.type = status->type;
+    newAGpsStatus.status = status->status;
+    newAGpsCallbacks->create_thread_cb("gpsshim-agpsstatus",(void *)newAGpsCallbacks->status_cb,(void*)&newAGpsStatus);
 }
 
 static void agps_init_wrapper(AGpsCallbacks * callbacks)
 {
-	newAGpsCallbacks = callbacks;
-	oldAGpsCallbacks.status_cb = agps_status_cb;
-	 
-	oldAGPS->init(&oldAGpsCallbacks);	
+    newAGpsCallbacks = callbacks;
+    oldAGpsCallbacks.status_cb = agps_status_cb;
+
+    oldAGPS->init(&oldAGpsCallbacks);
 }
 
 
@@ -199,71 +199,71 @@ static const GpsXtraCallbacks* newXtraCallbacks = NULL;
 
 static void xtra_download_cb()
 {
-	newXtraCallbacks->create_thread_cb("gpsshim-xtradownload",(void *)newXtraCallbacks->download_request_cb,NULL);	
+    newXtraCallbacks->create_thread_cb("gpsshim-xtradownload",(void *)newXtraCallbacks->download_request_cb,NULL);
 }
 
 static int xtra_init_wrapper(GpsXtraCallbacks * callbacks)
 {
-	newXtraCallbacks = callbacks;
-	oldXtraCallbacks.download_request_cb = xtra_download_cb;
+    newXtraCallbacks = callbacks;
+    oldXtraCallbacks.download_request_cb = xtra_download_cb;
 
 #ifdef NEEDS_INITIAL_XTRA
-	xtra_download_cb();
+    xtra_download_cb();
 #endif
-	 
-	return oldXTRA->init(&oldXtraCallbacks);	
+
+    return oldXTRA->init(&oldXtraCallbacks);
 }
 
 static const void* wrapper_get_extension(const char* name)
 {
     if (strcmp(name, GPS_XTRA_INTERFACE) == 0)
     {
-		oldXTRA = originalGpsInterface->get_extension(name);
-		newXTRA.size = sizeof(GpsXtraInterface);
-		newXTRA.init = xtra_init_wrapper;
-		newXTRA.inject_xtra_data = oldXTRA->inject_xtra_data;
+        oldXTRA = originalGpsInterface->get_extension(name);
+        newXTRA.size = sizeof(GpsXtraInterface);
+        newXTRA.init = xtra_init_wrapper;
+        newXTRA.inject_xtra_data = oldXTRA->inject_xtra_data;
         return &newXTRA;
     }
     else if (strcmp(name, AGPS_INTERFACE) == 0)
     {
-		oldAGPS = originalGpsInterface->get_extension(name);
-		newAGPS.size = sizeof(AGpsInterface);
-		newAGPS.init = agps_init_wrapper;
-		newAGPS.data_conn_open = oldAGPS->data_conn_open;
-		newAGPS.data_conn_closed = oldAGPS->data_conn_closed;
-		newAGPS.data_conn_failed = oldAGPS->data_conn_failed;
-		newAGPS.set_server = oldAGPS->set_server;
+        oldAGPS = originalGpsInterface->get_extension(name);
+        newAGPS.size = sizeof(AGpsInterface);
+        newAGPS.init = agps_init_wrapper;
+        newAGPS.data_conn_open = oldAGPS->data_conn_open;
+        newAGPS.data_conn_closed = oldAGPS->data_conn_closed;
+        newAGPS.data_conn_failed = oldAGPS->data_conn_failed;
+        newAGPS.set_server = oldAGPS->set_server;
         return &newAGPS;
     }
     /*else if (strcmp(name, GPS_NI_INTERFACE) == 0)
-    {
-		oldNI = originalGpsInterface->get_extension(name);
-		newNI.size = sizeof(GpsNiInterface);
-		newNI.init = oldNI->init;
-		newNI.respond = oldNI->respond;
-        return &newNI;
-    }*/
+      {
+      oldNI = originalGpsInterface->get_extension(name);
+      newNI.size = sizeof(GpsNiInterface);
+      newNI.init = oldNI->init;
+      newNI.respond = oldNI->respond;
+      return &newNI;
+      }*/
 
     return NULL;
 }
 
 static OldGpsCallbacks oldCallbacks;
 static int  init_wrapper(GpsCallbacks* callbacks) {
-	originalCallbacks = callbacks;
-	oldCallbacks.location_cb = location_callback_wrapper;
-	oldCallbacks.status_cb = status_callback_wrapper;
-	oldCallbacks.sv_status_cb = svstatus_callback_wrapper;
-	//oldCallbacks.nmea_cb = nmea_callback_wrapper;
+    originalCallbacks = callbacks;
+    oldCallbacks.location_cb = location_callback_wrapper;
+    oldCallbacks.status_cb = status_callback_wrapper;
+    oldCallbacks.sv_status_cb = svstatus_callback_wrapper;
+    //oldCallbacks.nmea_cb = nmea_callback_wrapper;
 #ifdef NO_AGPS
-	originalCallbacks->set_capabilities_cb(0);
+    originalCallbacks->set_capabilities_cb(0);
 #else
-	originalCallbacks->set_capabilities_cb(GPS_CAPABILITY_MSB|GPS_CAPABILITY_MSA);
+    originalCallbacks->set_capabilities_cb(GPS_CAPABILITY_MSB|GPS_CAPABILITY_MSA);
 #endif
-	return originalGpsInterface->init(&oldCallbacks);
+    return originalGpsInterface->init(&oldCallbacks);
 }
 
 static int set_position_mode_wrapper(GpsPositionMode mode, GpsPositionRecurrence recurrence,  uint32_t min_interval, uint32_t preferred_accuracy, uint32_t preferred_time) {
-	return originalGpsInterface->set_position_mode(mode, recurrence ? 0 : (min_interval/1000));
+    return originalGpsInterface->set_position_mode(mode, recurrence ? 0 : (min_interval/1000));
 }
 
 
@@ -271,18 +271,18 @@ static int set_position_mode_wrapper(GpsPositionMode mode, GpsPositionRecurrence
 /* HAL Methods */
 const GpsInterface* gps__get_gps_interface(struct gps_device_t* dev)
 {
-	originalGpsInterface = gps_get_hardware_interface();
+    originalGpsInterface = gps_get_hardware_interface();
 
-	newGpsInterface.size = sizeof(GpsInterface);
-	newGpsInterface.init = init_wrapper;
-	newGpsInterface.start = originalGpsInterface->start;
-	newGpsInterface.stop = originalGpsInterface->stop;
-	newGpsInterface.cleanup = originalGpsInterface->cleanup;
-	newGpsInterface.inject_time = originalGpsInterface->inject_time;
-	newGpsInterface.inject_location = originalGpsInterface->inject_location;
-	newGpsInterface.delete_aiding_data = originalGpsInterface->delete_aiding_data;
-	newGpsInterface.set_position_mode = set_position_mode_wrapper;
-	newGpsInterface.get_extension = wrapper_get_extension;
+    newGpsInterface.size = sizeof(GpsInterface);
+    newGpsInterface.init = init_wrapper;
+    newGpsInterface.start = originalGpsInterface->start;
+    newGpsInterface.stop = originalGpsInterface->stop;
+    newGpsInterface.cleanup = originalGpsInterface->cleanup;
+    newGpsInterface.inject_time = originalGpsInterface->inject_time;
+    newGpsInterface.inject_location = originalGpsInterface->inject_location;
+    newGpsInterface.delete_aiding_data = originalGpsInterface->delete_aiding_data;
+    newGpsInterface.set_position_mode = set_position_mode_wrapper;
+    newGpsInterface.get_extension = wrapper_get_extension;
 
 
     return &newGpsInterface;
