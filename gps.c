@@ -231,17 +231,15 @@ static int xtra_init_wrapper(GpsXtraCallbacks * callbacks)
 
 static const void* wrapper_get_extension(const char* name)
 {
-    if (strcmp(name, GPS_XTRA_INTERFACE) == 0)
+    if ((strcmp(name, GPS_XTRA_INTERFACE) == 0) && (oldXTRA = originalGpsInterface->get_extension(name)))
     {
-        oldXTRA = originalGpsInterface->get_extension(name);
         newXTRA.size = sizeof(GpsXtraInterface);
         newXTRA.init = xtra_init_wrapper;
         newXTRA.inject_xtra_data = oldXTRA->inject_xtra_data;
         return &newXTRA;
     }
-    else if (strcmp(name, AGPS_INTERFACE) == 0)
+    else if ((strcmp(name, AGPS_INTERFACE) == 0) && (oldAGPS = originalGpsInterface->get_extension(name)))
     {
-        oldAGPS = originalGpsInterface->get_extension(name);
         newAGPS.size = sizeof(AGpsInterface);
         newAGPS.init = agps_init_wrapper;
         newAGPS.data_conn_open = oldAGPS->data_conn_open;
