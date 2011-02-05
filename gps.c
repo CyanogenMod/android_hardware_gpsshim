@@ -183,9 +183,16 @@ static void svstatus_callback_wrapper(OldGpsSvStatus *sv_info) {
     originalCallbacks->create_thread_cb("gpsshim-svstatus",(void *)originalCallbacks->sv_status_cb,(void *)&newSvStatus);
 }
 
+GpsUtcTime nmeasave_timestamp; const char* nmeasave_nmea; int nmeasave_length;
+
+static void nmea_callback(void *unused) {
+    LOGV("Invoking nmea callback");
+    originalCallbacks->nmea_cb(nmeasave_timestamp, nmeasave_nmea, nmeasave_length);
+}
+
 static void nmea_callback_wrapper(GpsUtcTime timestamp, const char* nmea, int length) {
-    // Sink it for now. Needs to run in a thread_cb
-    // originalCallbacks->nmea_cb(timestamp, nmea, length);
+    nmeasave_timestamp = timestamp; nmeasave_nmea = nmea; nmeasave_length=length;
+    originalCallbacks->create_thread_cb("gpsshim-nmea",(void *)nmea_callback,NULL);
 }
 
 static OldAGpsCallbacks oldAGpsCallbacks;
@@ -269,7 +276,7 @@ static int  init_wrapper(GpsCallbacks* callbacks) {
     oldCallbacks.location_cb = location_callback_wrapper;
     oldCallbacks.status_cb = status_callback_wrapper;
     oldCallbacks.sv_status_cb = svstatus_callback_wrapper;
-    //oldCallbacks.nmea_cb = nmea_callback_wrapper;
+    oldCallbacks.nmea_cb = nmea_callback_wrapper;
 #ifdef NO_AGPS
     originalCallbacks->set_capabilities_cb(0);
 #else
