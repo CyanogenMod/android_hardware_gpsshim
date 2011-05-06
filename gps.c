@@ -26,105 +26,7 @@
 #define LOG_TAG "gps-shim"
 #include <utils/Log.h>
 
-
-
-/** List of older GPS interfaces. */
-
-
-/* XTRA */
-typedef struct {
-    gps_xtra_download_request download_request_cb;
-} OldGpsXtraCallbacks;
-
-typedef struct {
-    int  (*init)( OldGpsXtraCallbacks* callbacks );
-    int  (*inject_xtra_data)( char* data, int length );
-} OldGpsXtraInterface;
-
-/* AGPS */
-typedef struct {
-    AGpsType        type;
-    AGpsStatusValue status;
-} OldAGpsStatus;
-
-typedef void (* old_agps_status_callback)(OldAGpsStatus* status);
-
-typedef struct {
-    old_agps_status_callback status_cb;
-} OldAGpsCallbacks;
-
-typedef struct {
-    void  (*init)( OldAGpsCallbacks* callbacks );
-    int  (*data_conn_open)( const char* apn );
-    int  (*data_conn_closed)();
-    int  (*data_conn_failed)();
-    int  (*set_server)( AGpsType type, const char* hostname, int port );
-} OldAGpsInterface;
-
-/* NI */
-typedef struct
-{
-    void (*init) (GpsNiCallbacks *callbacks);
-    void (*respond) (int notif_id, GpsUserResponseType user_response);
-} OldGpsNiInterface;
-
-/* Core structures */
-typedef struct {
-    uint16_t        flags;
-    double          latitude;
-    double          longitude;
-    double          altitude;
-    float           speed;
-    float           bearing;
-    float           accuracy;
-    GpsUtcTime      timestamp;
-} OldGpsLocation;
-
-typedef struct {
-    GpsStatusValue status;
-} OldGpsStatus;
-
-typedef struct {
-    int     prn;
-    float   snr;
-    float   elevation;
-    float   azimuth;
-} OldGpsSvInfo;
-
-typedef struct {
-    int         num_svs;
-    OldGpsSvInfo   sv_list[GPS_MAX_SVS];
-    uint32_t    ephemeris_mask;
-    uint32_t    almanac_mask;
-    uint32_t    used_in_fix_mask;
-} OldGpsSvStatus;
-
-
-/* Core GPS HAL Callbacks */
-typedef void (* old_gps_location_callback)(OldGpsLocation* location);
-typedef void (* old_gps_status_callback)(OldGpsStatus* status);
-typedef void (* old_gps_sv_status_callback)(OldGpsSvStatus* sv_info);
-
-typedef struct {
-    old_gps_location_callback location_cb;
-    old_gps_status_callback status_cb;
-    old_gps_sv_status_callback sv_status_cb;
-    gps_nmea_callback nmea_cb;
-} OldGpsCallbacks;
-
-
-typedef struct {
-    int   (*init)( OldGpsCallbacks* callbacks );
-    int   (*start)( void );
-    int   (*stop)( void );
-    void  (*cleanup)( void );
-    int   (*inject_time)(GpsUtcTime time, int64_t timeReference,
-            int uncertainty);
-    int  (*inject_location)(double latitude, double longitude, float accuracy);
-    void  (*delete_aiding_data)(GpsAidingData flags);
-    int   (*set_position_mode)(GpsPositionMode mode, int fix_frequency);
-    const void* (*get_extension)(const char* name);
-} OldGpsInterface;
+#include <gpsshim.h>
 
 
 GpsCallbacks *originalCallbacks;
@@ -132,6 +34,8 @@ static const OldGpsXtraInterface* oldXTRA = NULL;
 static GpsXtraInterface newXTRA;
 static const OldAGpsInterface* oldAGPS = NULL;
 static AGpsInterface newAGPS;
+static const OldAGpsRilInterface* oldAGPSRIL = NULL;
+static AGpsRilInterface newAGPSRIL;
 static const OldGpsNiInterface* oldNI = NULL;
 static GpsNiInterface newNI;
 
@@ -215,6 +119,30 @@ static void agps_init_wrapper(AGpsCallbacks * callbacks)
     oldAGPS->init(&oldAGpsCallbacks);
 }
 
+static OldAGpsRilCallbacks oldAGpsRilCallbacks;
+static const AGpsRilCallbacks* newAGpsRilCallbacks = NULL;
+
+static void agpsril_setid_cb(uint32_t flags)
+{
+    LOGV("AGPSRIL setid callback");
+    newAGpsRilCallbacks->create_thread_cb("gpsshim-agpsril-setid",(void *)newAGpsRilCallbacks->request_setid,&flags);
+}
+
+static void agpsril_refloc_cb(uint32_t flags)
+{
+    LOGV("AGPSRIL refloc callback");
+    newAGpsRilCallbacks->create_thread_cb("gpsshim-agpsril-refloc",(void *)newAGpsRilCallbacks->request_refloc,&flags);
+}
+
+static void agpsril_init_wrapper(AGpsRilCallbacks * callbacks)
+{
+    newAGpsRilCallbacks = callbacks;
+    oldAGpsRilCallbacks.request_setid = agpsril_setid_cb;
+    oldAGpsRilCallbacks.request_refloc = agpsril_refloc_cb;
+    LOGV("AGPSRIL init");
+
+    oldAGPSRIL->init(&oldAGpsRilCallbacks);
+}
 
 static OldGpsXtraCallbacks oldXtraCallbacks;
 static const GpsXtraCallbacks* newXtraCallbacks = NULL;
@@ -238,14 +166,14 @@ static int xtra_init_wrapper(GpsXtraCallbacks * callbacks)
 
 static const void* wrapper_get_extension(const char* name)
 {
-    if ((strcmp(name, GPS_XTRA_INTERFACE) == 0) && (oldXTRA = originalGpsInterface->get_extension(name)))
+    if (!strcmp(name, GPS_XTRA_INTERFACE) && (oldXTRA = originalGpsInterface->get_extension(name)))
     {
         newXTRA.size = sizeof(GpsXtraInterface);
         newXTRA.init = xtra_init_wrapper;
         newXTRA.inject_xtra_data = oldXTRA->inject_xtra_data;
         return &newXTRA;
     }
-    else if ((strcmp(name, AGPS_INTERFACE) == 0) && (oldAGPS = originalGpsInterface->get_extension(name)))
+    else if (!strcmp(name, AGPS_INTERFACE) && (oldAGPS = originalGpsInterface->get_extension(name)))
     {
         newAGPS.size = sizeof(AGpsInterface);
         newAGPS.init = agps_init_wrapper;
@@ -254,6 +182,15 @@ static const void* wrapper_get_extension(const char* name)
         newAGPS.data_conn_failed = oldAGPS->data_conn_failed;
         newAGPS.set_server = oldAGPS->set_server;
         return &newAGPS;
+    }
+    else if (!strcmp(name, AGPS_RIL_INTERFACE) && (oldAGPSRIL = originalGpsInterface->get_extension(name)))
+    {
+        newAGPSRIL.size = sizeof(AGpsRilInterface);
+        newAGPSRIL.init = agpsril_init_wrapper;
+        newAGPSRIL.set_ref_location = oldAGPSRIL->set_ref_location;
+        newAGPSRIL.set_set_id = oldAGPSRIL->set_set_id;
+        newAGPSRIL.ni_message = oldAGPSRIL->ni_message;
+        return &newAGPSRIL;
     }
     /*else if (strcmp(name, GPS_NI_INTERFACE) == 0)
       {
@@ -289,9 +226,7 @@ static int set_position_mode_wrapper(GpsPositionMode mode, GpsPositionRecurrence
 
 
 static void cleanup_wrapper() {
-    /* Cleanup is killing something that prevents further starts.
-     * Skip it for now :\ */
-    //originalGpsInterface->cleanup();
+    originalGpsInterface->cleanup();
 }
 
 /* HAL Methods */
