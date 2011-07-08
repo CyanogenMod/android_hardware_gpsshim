@@ -224,9 +224,15 @@ static int set_position_mode_wrapper(GpsPositionMode mode, GpsPositionRecurrence
     return originalGpsInterface->set_position_mode(mode, recurrence ? 0 : (min_interval/1000));
 }
 
+static int stop_wrapper() {
+    int ret = originalGpsInterface->stop();
+    originalCallbacks->release_wakelock_cb();
+    return ret;
+}
 
-static void cleanup_wrapper() {
-    originalGpsInterface->cleanup();
+static int start_wrapper() {
+    originalCallbacks->acquire_wakelock_cb();
+    return originalGpsInterface->start();
 }
 
 /* HAL Methods */
@@ -237,9 +243,9 @@ const GpsInterface* gps__get_gps_interface(struct gps_device_t* dev)
 
     newGpsInterface.size = sizeof(GpsInterface);
     newGpsInterface.init = init_wrapper;
-    newGpsInterface.start = originalGpsInterface->start;
-    newGpsInterface.stop = originalGpsInterface->stop;
-    newGpsInterface.cleanup = cleanup_wrapper;
+    newGpsInterface.start = start_wrapper;
+    newGpsInterface.stop = stop_wrapper;
+    newGpsInterface.cleanup = originalGpsInterface->cleanup;
     newGpsInterface.inject_time = originalGpsInterface->inject_time;
     newGpsInterface.inject_location = originalGpsInterface->inject_location;
     newGpsInterface.delete_aiding_data = originalGpsInterface->delete_aiding_data;
